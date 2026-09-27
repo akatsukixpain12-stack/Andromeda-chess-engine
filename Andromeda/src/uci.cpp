@@ -1,56 +1,110 @@
 #include "uci.h"
-#include "tt.h"
 #include "attacks.h"
 #include "evaluate.h"
+#include "tt.h"
+
+#include <algorithm>
+#include <cctype>
 #include <iostream>
 #include <sstream>
-#include <thread>
+#include <string>
 
 namespace Andromeda {
 
-Move UCI::parse_move(const Position& pos, const std::string& str) {
-    if (str.length() < 4) return Move::none();
+namespace {
+Position g_position;
+StateInfo g_root_state{};
+bool g_initialized = false;
+std::string g_output;
 
-    Square from = make_square(static_cast<File>(str[0] - 'a'), static_cast<Rank>(str[1] - '1'));
-    Square to = make_square(static_cast<File>(str[2] - 'a'), static_cast<Rank>(str[3] - '1'));
+void append_output(const std::string& line) {
+    g_output += line;
+    g_output.push_back('\n');
+}
+}
+
+void UCI::initialize() {
+    if (g_initialized)
+        return;
+
+    init_bitboards();
+    init_attacks();
+    init_zobrist();
+    init_evaluation();
+    TT.resize(64);
+    g_position.set_startpos(&g_root_state);
+    g_initialized = true;
+}
+
+void UCI::emit(const std::string& line) {
+    append_output(line);
+}
+
+const char* UCI::output_c_str() {
+    return g_output.c_str();
+}
+
+Move UCI::parse_move(const Position& pos, const std::string& str) {
+    if (str.length() < 4)
+        return Move::none();
+    if (str[0] < 'a' || str[0] > 'h' || str[2] < 'a' || str[2] > 'h'
+        || str[1] < '1' || str[1] > '8' || str[3] < '1' || str[3] > '8')
+        return Move::none();
+
+    const Square from = make_square(static_cast<File>(str[0] - 'a'),
+                                    static_cast<Rank>(str[1] - '1'));
+    const Square to = make_square(static_cast<File>(str[2] - 'a'),
+                                  static_cast<Rank>(str[3] - '1'));
 
     Move legal[256];
     Position temp_pos = pos;
-    int count = generate_legal_moves(temp_pos, legal);
+    const int count = generate_legal_moves(temp_pos, legal);
 
     for (int i = 0; i < count; ++i) {
-        Move m = legal[i];
-        if (m.from() == from && m.to() == to) {
-            if (m.type() == PROMOTION) {
-                if (str.length() >= 5) {
-                    char promo = std::tolower(str[4]);
-                    PieceType pt = QUEEN;
-                    if (promo == 'n') pt = KNIGHT;
-                    else if (promo == 'b') pt = BISHOP;
-                    else if (promo == 'r') pt = ROOK;
-                    if (m.promotion_type() == pt) return m;
-                }
-            } else {
+        const Move m = legal[i];
+        if (m.from() != from || m.to() != to)
+            continue;
+
+        if (m.type() == PROMOTION) {
+            if (str.length() < 5)
+                continue;
+
+            const char promo = static_cast<char>(std::tolower(str[4]));
+            PieceType pt = QUEEN;
+            if (promo == 'n') pt = KNIGHT;
+            else if (promo == 'b') pt = BISHOP;
+            else if (promo == 'r') pt = ROOK;
+
+            if (m.promotion_type() == pt)
                 return m;
-            }
+        } else {
+            return m;
         }
     }
+
     return Move::none();
 }
 
 void UCI::parse_position(Position& pos, const std::string& line, StateInfo& si) {
     std::istringstream ss(line);
     std::string token;
-    ss >> token; // skip "position"
-
     ss >> token;
+    ss >> token;
+
     if (token == "startpos") {
         pos.set_startpos(&si);
-        ss >> token; // check if "moves" follows
+        ss >> token;
     } else if (token == "fen") {
         std::string fen;
-        while (ss >> token && token != "moves") {
-            fen += token + " ";
+        int fields = 0;
+        while (ss >> token) {
+            if (token == "moves")
+                break;
+            if (fields++)
+                fen += ' ';
+            fen += token;
+            if (fields >= 6)
+                break;
         }
         pos.set(fen, &si);
     }
@@ -58,11 +112,10 @@ void UCI::parse_position(Position& pos, const std::string& line, StateInfo& si) 
     if (token == "moves") {
         static StateInfo move_history[1024];
         int history_idx = 0;
-        while (ss >> token) {
-            Move m = parse_move(pos, token);
-            if (m != Move::none()) {
+        while (ss >> token && history_idx < 1023) {
+            const Move m = parse_move(pos, token);
+            if (m != Move::none())
                 pos.do_move(m, move_history[history_idx++]);
-            }
         }
     }
 }
@@ -70,10 +123,9 @@ void UCI::parse_position(Position& pos, const std::string& line, StateInfo& si) 
 void UCI::parse_go(Position& pos, const std::string& line) {
     std::istringstream ss(line);
     std::string token;
-    ss >> token; // skip "go"
+    ss >> token;
 
     SearchLimits limits;
-
     while (ss >> token) {
         if (token == "wtime") ss >> limits.wtime;
         else if (token == "btime") ss >> limits.btime;
@@ -90,49 +142,65 @@ void UCI::parse_go(Position& pos, const std::string& line) {
     GlobalSearcher.start_search(pos, limits);
 }
 
+void UCI::process_command(const std::string& line) {
+    initialize();
+    g_output.clear();
+
+    std::istringstream ss(line);
+    std::string command;
+    ss >> command;
+
+    if (command == "uci") {
+        emit("id name Andromeda");
+        emit("id author Andromeda Dev Team");
+        emit("option name Hash type spin default 64 min 1 max 4096");
+        emit("option name Aggression type spin default 55 min 0 max 100");
+        emit("option name Threads type spin default 1 min 1 max 1");
+        emit("uciok");
+    } else if (command == "isready") {
+        emit("readyok");
+    } else if (command == "setoption") {
+        std::string rest;
+        std::getline(ss, rest);
+        const std::size_t value_pos = rest.find(" value ");
+        std::string name = value_pos == std::string::npos ? rest : rest.substr(0, value_pos);
+        std::string value = value_pos == std::string::npos ? "" : rest.substr(value_pos + 7);
+
+        while (!name.empty() && name.front() == ' ') name.erase(name.begin());
+        while (!name.empty() && name.back() == ' ') name.pop_back();
+
+        if (name == "Hash" && !value.empty()) {
+            TT.resize(static_cast<size_t>(std::max(1, std::min(4096, std::stoi(value)))));
+        } else if (name == "Aggression" && !value.empty()) {
+            set_aggression(std::stoi(value));
+        }
+    } else if (command == "ucinewgame") {
+        TT.clear();
+        g_position.set_startpos(&g_root_state);
+    } else if (command == "position") {
+        parse_position(g_position, line, g_root_state);
+    } else if (command == "go") {
+        parse_go(g_position, line);
+    } else if (command == "stop") {
+        GlobalSearcher.stop();
+    } else if (command == "eval") {
+        emit("info string eval " + std::to_string(evaluate(g_position)));
+    } else if (command == "d") {
+        emit("info string fen " + g_position.fen());
+    }
+}
+
 void UCI::loop() {
-    Position pos;
-    StateInfo si;
-    pos.set_startpos(&si);
+    initialize();
 
     std::string line;
     while (std::getline(std::cin, line)) {
-        std::istringstream ss(line);
-        std::string command;
-        ss >> command;
-
-        if (command == "uci") {
-            std::cout << "id name Andromeda 3.0" << std::endl;
-            std::cout << "id author Andromeda Dev Team" << std::endl;
-            std::cout << "option name Hash type spin default 64 min 1 max 65536" << std::endl;
-            std::cout << "option name Threads type spin default 1 min 1 max 512" << std::endl;
-            std::cout << "option name OwnBook type check default true" << std::endl;
-            std::cout << "option name Skill Level type spin default 20 min 0 max 20" << std::endl;
-            std::cout << "uciok" << std::endl;
-        } else if (command == "isready") {
-            std::cout << "readyok" << std::endl;
-        } else if (command == "setoption") {
-            std::string name_token, name, value_token, value;
-            ss >> name_token >> name >> value_token >> value;
-            if (name == "Hash") {
-                TT.resize(std::stoi(value));
-            }
-        } else if (command == "ucinewgame") {
-            TT.clear();
-            pos.set_startpos(&si);
-        } else if (command == "position") {
-            parse_position(pos, line, si);
-        } else if (command == "go") {
-            parse_go(pos, line);
-        } else if (command == "stop") {
-            GlobalSearcher.stop();
-        } else if (command == "eval") {
-            std::cout << "Evaluation: " << evaluate(pos) << " cp" << std::endl;
-        } else if (command == "d") {
-            std::cout << pos.fen() << std::endl;
-        } else if (command == "quit") {
+        if (line == "quit")
             break;
-        }
+
+        process_command(line);
+        std::cout << g_output;
+        std::cout.flush();
     }
 }
 
