@@ -134,25 +134,40 @@ Value Searcher::qsearch(Position& pos, SearchStack* ss, Value alpha, Value beta)
     if (ss->ply >= MAX_QDEPTH)
         return alpha;
 
-    Move moves[256];
-    Move* end = generate_moves<GEN_CAPTURES>(pos, moves);
+    // Quiescence must see forcing checks as well as captures.
+    // Searching only captures creates large tactical horizons.
+    Move legal[256];
+    const int count = generate_legal_moves(pos, legal);
 
-    for (Move* m = moves; m < end; ++m) {
-        if (stand_pat + 1200 < alpha
-            && m->type() != PROMOTION
-            && m->type() != EN_PASSANT)
+    for (int i = 0; i < count; ++i) {
+        const Move move = legal[i];
+        const bool capture = pos.is_capture(move);
+        const bool promotion = move.type() == PROMOTION;
+
+        if (!capture && !promotion) {
+            StateInfo probe;
+            if (!pos.do_move(move, probe))
+                continue;
+            const bool gives_check = pos.in_check();
+            pos.undo_move(move);
+            if (!gives_check)
+                continue;
+        }
+
+        if (capture && !promotion
+            && stand_pat + 1200 < alpha)
             continue;
 
         StateInfo si;
-        if (!pos.do_move(*m, si))
+        if (!pos.do_move(move, si))
             continue;
 
         SearchStack child = *ss;
-        child.current_move = *m;
+        child.current_move = move;
         child.ply = ss->ply + 1;
 
         const Value score = -qsearch(pos, &child, -beta, -alpha);
-        pos.undo_move(*m);
+        pos.undo_move(move);
 
         if (should_stop())
             return VALUE_ZERO;
