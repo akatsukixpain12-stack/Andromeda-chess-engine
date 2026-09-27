@@ -20,6 +20,7 @@ em++ -O3 -flto -std=c++17 -DNDEBUG -msimd128 \
   -sFILESYSTEM=0 \
   -sENVIRONMENT=web,worker \
   -sEXPORTED_FUNCTIONS="['_main','_initialize_engine','_send_uci_command','_get_uci_output']" \
-  -sEXPORTED_RUNTIME_METHODS="['UTF8ToString','ccall','cwrap']"
+  -sEXPORTED_RUNTIME_METHODS="['UTF8ToString','ccall','cwrap']" \\
+  --extern-post-js "$ROOT/scripts/browser-api.js"
 
 echo "Built $DIST/andromeda.js and $DIST/andromeda.wasm"
