@@ -4,6 +4,17 @@
 namespace Andromeda {
 
 namespace {
+    bool legal_move_exists(Position& pos, Move candidate) {
+        if (candidate == Move::none())
+            return false;
+        Move legal[256];
+        const int count = generate_legal_moves(pos, legal);
+        for (int i = 0; i < count; ++i)
+            if (legal[i] == candidate)
+                return true;
+        return false;
+    }
+
     const int VictimScores[PIECE_TYPE_NB] = { 0, 100, 300, 310, 500, 900, 10000 };
 }
 
@@ -45,7 +56,9 @@ Move MovePicker::next_move() {
         switch (stage_) {
             case STAGE_TT_MOVE:
                 stage_ = STAGE_GEN_CAPTURES;
-                return tt_move_;
+                if (legal_move_exists(pos_, tt_move_))
+                    return tt_move_;
+                break;
 
             case STAGE_GEN_CAPTURES: {
                 Move* end = generate_moves<GEN_CAPTURES>(pos_, moves_);
@@ -73,7 +86,8 @@ Move MovePicker::next_move() {
             case STAGE_KILLER_1: {
                 stage_ = STAGE_KILLER_2;
                 Move k1 = history_.get_killer(ply_, 0);
-                if (k1 != Move::none() && k1 != tt_move_ && !pos_.is_capture(k1)) {
+                if (k1 != Move::none() && k1 != tt_move_ && !pos_.is_capture(k1)
+                    && legal_move_exists(pos_, k1)) {
                     return k1;
                 }
                 break;
@@ -82,7 +96,8 @@ Move MovePicker::next_move() {
             case STAGE_KILLER_2: {
                 stage_ = STAGE_GEN_QUIETS;
                 Move k2 = history_.get_killer(ply_, 1);
-                if (k2 != Move::none() && k2 != tt_move_ && !pos_.is_capture(k2)) {
+                if (k2 != Move::none() && k2 != tt_move_ && !pos_.is_capture(k2)
+                    && legal_move_exists(pos_, k2)) {
                     return k2;
                 }
                 break;
