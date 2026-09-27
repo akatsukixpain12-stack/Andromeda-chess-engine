@@ -1,6 +1,7 @@
 #include "uci.h"
 #include "attacks.h"
 #include "evaluate.h"
+#include "movegen.h"
 #include "tt.h"
 
 #include <algorithm>
