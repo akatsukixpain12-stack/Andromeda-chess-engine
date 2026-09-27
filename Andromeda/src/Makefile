@@ -15,15 +15,9 @@ $(TARGET): $(OBJ)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 clean:
-	rm -f $(OBJ) $(TARGET) andromeda.js andromeda.wasm andromeda.worker.js
+	rm -f $(OBJ) $(TARGET)
 
 wasm:
-	em++ -O3 -std=c++17 $(SRC) -o andromeda.js \
-		-s WASM=1 \
-		-s ALLOW_MEMORY_GROWTH=1 \
-		-s EXPORTED_FUNCTIONS="['_main', '_send_uci_command']" \
-		-s EXPORTED_RUNTIME_METHODS="['cwrap', 'ccall']" \
-		-s MODULARIZE=1 \
-		-s EXPORT_NAME="AndromedaModule"
+	../../scripts/build-wasm.sh
 
 .PHONY: all clean wasm
