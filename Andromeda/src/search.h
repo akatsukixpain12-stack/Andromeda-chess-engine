@@ -4,6 +4,7 @@
 #include "timeman.h"
 #include "history.h"
 #include <atomic>
+#include <cstdint>
 #include <vector>
 
 namespace Andromeda {
@@ -25,8 +26,10 @@ struct SearchLimits {
 struct SearchStack {
     Move current_move;
     Move excluded_move;
-    Value static_eval;
-    int stat_score;
+    Value static_eval = VALUE_NONE;
+    int stat_score = 0;
+    int ply = 0;
+    bool in_check = false;
 };
 
 class Searcher {
@@ -44,6 +47,7 @@ private:
     Value qsearch(Position& pos, SearchStack* ss, Value alpha, Value beta);
 
     void check_time();
+    bool should_stop() const;
 
     std::atomic<bool> stop_flag_;
     std::atomic<bool> searching_;
@@ -52,6 +56,10 @@ private:
     TimeManager time_man_;
     HistoryTable history_;
     SearchLimits limits_;
+    Move best_move_;
+    Move completed_best_move_;
+    Value completed_score_;
+    int root_depth_;
 };
 
 extern Searcher GlobalSearcher;
