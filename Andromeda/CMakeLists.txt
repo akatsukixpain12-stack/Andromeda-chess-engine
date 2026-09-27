@@ -1,10 +1,10 @@
 cmake_minimum_required(VERSION 3.15)
-project(Andromeda VERSION 3.0.0 LANGUAGES CXX)
+project(Andromeda VERSION 4.0.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(SOURCES
+set(SOURCE_FILES
     src/main.cpp
     src/attacks.cpp
     src/bitboard.cpp
@@ -18,11 +18,14 @@ set(SOURCES
     src/uci.cpp
 )
 
-add_executable(andromeda ${SOURCES})
+add_executable(andromeda ${SOURCE_FILES})
 
 target_compile_options(andromeda PRIVATE
-    $<$<CXX_COMPILER_ID:GNU,Clang>:-O3 -flto -march=native -Wall -Wextra>
-    $<$<CXX_COMPILER_ID:MSVC>:/O2 /W4>
+    -O3
+    -flto
+    -Wall
+    -Wextra
+    -DNDEBUG
 )
 
 find_package(Threads REQUIRED)
