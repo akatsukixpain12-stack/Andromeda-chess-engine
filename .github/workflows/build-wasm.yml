@@ -1,0 +1,39 @@
+name: Build Andromeda WASM
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-wasm:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Emscripten
+        uses: emscripten-core/setup-emsdk@v15
+
+      - name: Verify toolchain
+        run: |
+          em++ --version
+          emcc --version
+
+      - name: Build
+        run: bash Andromeda/scripts/build-wasm.sh
+
+      - name: Commit generated engine
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dist/andromeda.js dist/andromeda.wasm
+          if git diff --cached --quiet; then
+            echo "No generated files changed."
+            exit 0
+          fi
+          git commit -m "build: regenerate Andromeda WASM engine [skip ci]"
+          git push
