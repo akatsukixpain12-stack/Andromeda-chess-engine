@@ -1,32 +1,30 @@
 #include "uci.h"
-#include "attacks.h"
-#include "position.h"
-#include "evaluate.h"
-#include "tt.h"
-#include <iostream>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
-
 extern "C" {
-    EMSCRIPTEN_KEEPALIVE
-    void send_uci_command(const char* cmd) {
-        // Expose UCI bridge for WebAssembly
-    }
+EMSCRIPTEN_KEEPALIVE
+void initialize_engine() {
+    Andromeda::UCI::initialize();
+}
+EMSCRIPTEN_KEEPALIVE
+void send_uci_command(const char* cmd) {
+    if (cmd)
+        Andromeda::UCI::process_command(cmd);
+}
+EMSCRIPTEN_KEEPALIVE
+const char* get_uci_output() {
+    return Andromeda::UCI::output_c_str();
+}
 }
 #endif
 
 int main(int argc, char* argv[]) {
-    std::cout << "Andromeda Chess Engine v3.0 [AVX-512 / NNUE / WebAssembly]" << std::endl;
-    std::cout << "Engine loaded and ready for UCI commands." << std::endl;
-
-    Andromeda::init_bitboards();
-    Andromeda::init_attacks();
-    Andromeda::init_zobrist();
-    Andromeda::init_evaluation();
-    Andromeda::TT.resize(64);
-
+    (void)argc;
+    (void)argv;
+    Andromeda::UCI::initialize();
+#ifndef __EMSCRIPTEN__
     Andromeda::UCI::loop();
-
+#endif
     return 0;
 }
