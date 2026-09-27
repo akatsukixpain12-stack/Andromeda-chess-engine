@@ -137,7 +137,7 @@ public:
     static constexpr Move null() { return Move(0); }
 
 private:
-    uint16_t data_;
+    uint16_t data_ = 0;
 };
 
 } // namespace Andromeda
