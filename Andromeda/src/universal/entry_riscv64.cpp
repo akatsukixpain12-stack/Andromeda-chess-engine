@@ -1,0 +1,1 @@
+extern "C" void andromeda_universal_riscv64_entry() {}
