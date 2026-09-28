@@ -1,6 +1,8 @@
 #include "position.h"
 #include <sstream>
 #include <cstring>
+#include <cctype>
+#include <cstdlib>
 
 namespace Andromeda {
 
