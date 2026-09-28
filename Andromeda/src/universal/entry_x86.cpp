@@ -1,0 +1,1 @@
+extern "C" void andromeda_universal_x86_entry() {}
