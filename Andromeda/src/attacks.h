@@ -110,6 +110,12 @@ extern Bitboard RayPassBB[SQUARE_NB][SQUARE_NB];
 
 void init_attacks();
 
+Bitboard bishop_attacks(Square s, Bitboard occupied);
+Bitboard rook_attacks(Square s, Bitboard occupied);
+inline Bitboard queen_attacks(Square s, Bitboard occupied) {
+    return bishop_attacks(s, occupied) | rook_attacks(s, occupied);
+}
+
 inline Bitboard line_bb(Square s1, Square s2) {
     assert(is_ok(s1) && is_ok(s2));
     return LineBB[s1][s2];
@@ -145,13 +151,6 @@ inline Bitboard attacks_bb(PieceType pt, Square s, Bitboard occupied) {
 inline Bitboard attacks_bb(Piece pc, Square s, Bitboard occupied) {
     return type_of(pc) == PAWN ? PawnAttacks[color_of(pc)][s]
                                 : attacks_bb(type_of(pc), s, occupied);
-}
-
-Bitboard bishop_attacks(Square s, Bitboard occupied);
-Bitboard rook_attacks(Square s, Bitboard occupied);
-
-inline Bitboard queen_attacks(Square s, Bitboard occupied) {
-    return bishop_attacks(s, occupied) | rook_attacks(s, occupied);
 }
 
 } // namespace Andromeda
