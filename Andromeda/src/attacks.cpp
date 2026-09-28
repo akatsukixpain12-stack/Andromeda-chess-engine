@@ -1,5 +1,6 @@
 #include "attacks.h"
-#include <vector>
+
+#include <algorithm>
 
 namespace Andromeda {
 
@@ -8,87 +9,104 @@ Bitboard KnightAttacks[SQUARE_NB];
 Bitboard KingAttacks[SQUARE_NB];
 Bitboard BishopMasks[SQUARE_NB];
 Bitboard RookMasks[SQUARE_NB];
+Bitboard LineBB[SQUARE_NB][SQUARE_NB];
+Bitboard BetweenBB[SQUARE_NB][SQUARE_NB];
+Bitboard RayPassBB[SQUARE_NB][SQUARE_NB];
 
 namespace {
-    const int BishopDirections[4][2] = {{1, 1}, {1, -1}, {-1, 1}, {-1, -1}};
-    const int RookDirections[4][2]   = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
 
-    Bitboard sliding_attack(int r, int f, int dr, int df, Bitboard occ) {
-        Bitboard attacks = 0;
-        int cr = r + dr;
-        int cf = f + df;
-        while (cr >= 0 && cr < 8 && cf >= 0 && cf < 8) {
-            Square sq = make_square(static_cast<File>(cf), static_cast<Rank>(cr));
-            attacks |= square_bb(sq);
-            if (occ & square_bb(sq)) break;
-            cr += dr;
-            cf += df;
-        }
-        return attacks;
+Bitboard ray_between_or_line(Square a, Square b, bool between_only) {
+    const int af = int(file_of(a)), ar = int(rank_of(a));
+    const int bf = int(file_of(b)), br = int(rank_of(b));
+    const int df = bf - af, dr = br - ar;
+
+    int sf = 0, sr = 0;
+    if (df == 0 && dr != 0) sr = dr > 0 ? 1 : -1;
+    else if (dr == 0 && df != 0) sf = df > 0 ? 1 : -1;
+    else if (std::abs(df) == std::abs(dr) && df != 0) {
+        sf = df > 0 ? 1 : -1;
+        sr = dr > 0 ? 1 : -1;
+    } else {
+        return 0;
     }
+
+    Bitboard result = 0;
+    int f = af, r = ar;
+    if (!between_only)
+        result |= square_bb(a);
+
+    f += sf;
+    r += sr;
+    while (f != bf || r != br) {
+        result |= square_bb(make_square(File(f), Rank(r)));
+        f += sf;
+        r += sr;
+    }
+
+    if (!between_only)
+        result |= square_bb(b);
+
+    return result;
 }
 
+} // namespace
+
 Bitboard bishop_attacks(Square s, Bitboard occ) {
-    int r = rank_of(s);
-    int f = file_of(s);
-    Bitboard att = 0;
-    for (auto& d : BishopDirections) {
-        att |= sliding_attack(r, f, d[0], d[1], occ);
-    }
-    return att;
+    return sliding_attack(BISHOP, s, occ);
 }
 
 Bitboard rook_attacks(Square s, Bitboard occ) {
-    int r = rank_of(s);
-    int f = file_of(s);
-    Bitboard att = 0;
-    for (auto& d : RookDirections) {
-        att |= sliding_attack(r, f, d[0], d[1], occ);
-    }
-    return att;
+    return sliding_attack(ROOK, s, occ);
 }
 
 void init_attacks() {
-    for (int s = 0; s < 64; ++s) {
-        Square sq = static_cast<Square>(s);
-        int r = rank_of(sq);
-        int f = file_of(sq);
+    for (int s = 0; s < SQUARE_NB; ++s) {
+        PawnAttacks[WHITE][s] = pawn_attacks_bb(WHITE, square_bb(Square(s)));
+        PawnAttacks[BLACK][s] = pawn_attacks_bb(BLACK, square_bb(Square(s)));
+        KnightAttacks[s] = knight_attack(Square(s));
+        KingAttacks[s] = king_attack(Square(s));
+        BishopMasks[s] = sliding_attack(BISHOP, Square(s), 0);
+        RookMasks[s] = sliding_attack(ROOK, Square(s), 0);
+    }
 
-        // Pawn Attacks
-        if (r < 7) {
-            if (f > 0) PawnAttacks[WHITE][sq] |= square_bb(make_square(static_cast<File>(f - 1), static_cast<Rank>(r + 1)));
-            if (f < 7) PawnAttacks[WHITE][sq] |= square_bb(make_square(static_cast<File>(f + 1), static_cast<Rank>(r + 1)));
-        }
-        if (r > 0) {
-            if (f > 0) PawnAttacks[BLACK][sq] |= square_bb(make_square(static_cast<File>(f - 1), static_cast<Rank>(r - 1)));
-            if (f < 7) PawnAttacks[BLACK][sq] |= square_bb(make_square(static_cast<File>(f + 1), static_cast<Rank>(r - 1)));
-        }
+    for (int a = 0; a < SQUARE_NB; ++a) {
+        for (int b = 0; b < SQUARE_NB; ++b) {
+            const Square s1 = Square(a);
+            const Square s2 = Square(b);
+            const Bitboard line = ray_between_or_line(s1, s2, false);
+            LineBB[a][b] = line;
 
-        // Knight Attacks
-        const int k_offsets[8][2] = {
-            {-2, -1}, {-2, 1}, {-1, -2}, {-1, 2},
-            {1, -2}, {1, 2}, {2, -1}, {2, 1}
-        };
-        for (auto& o : k_offsets) {
-            int nr = r + o[0];
-            int nf = f + o[1];
-            if (nr >= 0 && nr < 8 && nf >= 0 && nf < 8) {
-                KnightAttacks[sq] |= square_bb(make_square(static_cast<File>(nf), static_cast<Rank>(nr)));
+            if (line == 0 || a == b) {
+                BetweenBB[a][b] = 0;
+                RayPassBB[a][b] = 0;
+                continue;
             }
-        }
 
-        // King Attacks
-        const int king_offsets[8][2] = {
-            {-1, -1}, {-1, 0}, {-1, 1},
-            {0, -1},           {0, 1},
-            {1, -1},  {1, 0},  {1, 1}
-        };
-        for (auto& o : king_offsets) {
-            int nr = r + o[0];
-            int nf = f + o[1];
-            if (nr >= 0 && nr < 8 && nf >= 0 && nf < 8) {
-                KingAttacks[sq] |= square_bb(make_square(static_cast<File>(nf), static_cast<Rank>(nr)));
+            const int af = int(file_of(s1)), ar = int(rank_of(s1));
+            const int bf = int(file_of(s2)), br = int(rank_of(s2));
+            const int sf = (bf > af) - (bf < af);
+            const int sr = (br > ar) - (br < ar);
+
+            Bitboard between = 0;
+            int f = af + sf, r = ar + sr;
+            while (f != bf || r != br) {
+                between |= square_bb(make_square(File(f), Rank(r)));
+                f += sf;
+                r += sr;
             }
+            between &= ~square_bb(s1);
+            between &= ~square_bb(s2);
+            BetweenBB[a][b] = between;
+
+            Bitboard pass = 0;
+            f = bf + sf;
+            r = br + sr;
+            while (f >= 0 && f < 8 && r >= 0 && r < 8) {
+                pass |= square_bb(make_square(File(f), Rank(r)));
+                f += sf;
+                r += sr;
+            }
+            RayPassBB[a][b] = pass;
         }
     }
 }
