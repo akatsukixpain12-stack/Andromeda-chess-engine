@@ -1,4 +1,4 @@
-#include "benchmark.h"
+#include "benchmarks.h"
 #include "position.h"
 #include "movegen.h"
 #include "attacks.h"
