@@ -9,13 +9,19 @@ set(SOURCE_FILES
     src/attacks.cpp
     src/bitboard.cpp
     src/evaluate.cpp
+    src/engine.cpp
+    src/memory.cpp
+    src/misc.cpp
     src/movegen.cpp
     src/movepick.cpp
     src/position.cpp
     src/search.cpp
+    src/score.cpp
+    src/thread.cpp
     src/timeman.cpp
     src/tt.cpp
     src/uci.cpp
+    src/ucioption.cpp
 )
 
 add_executable(andromeda ${SOURCE_FILES})
