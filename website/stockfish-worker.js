@@ -1,0 +1,1 @@
+importScripts("./stockfish.js");let engine=null;try{engine=Stockfish({locateFile:f=>f.endsWith(".wasm")?"./stockfish.wasm":f,listener:l=>postMessage(l)})}catch(e){postMessage("info string Stockfish initialization failed: "+e)}self.onmessage=e=>{if(!engine)return;try{engine(String(e.data))}catch(x){postMessage("info string "+x.message)}};
