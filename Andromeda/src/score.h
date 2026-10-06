@@ -1,4 +1,4 @@
-/* Andromeda - Stockfish-inspired score representation. GPLv3 applies to derived portions. */
+/* Andromeda - Andromeda-inspired score representation. GPLv3 applies to derived portions. */
 #ifndef SCORE_H_INCLUDED
 #define SCORE_H_INCLUDED
 #include <variant>
