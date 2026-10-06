@@ -295,6 +295,6 @@ inline Bitboard attacks_bb(Piece pc, Square s, Bitboard occupied) {
                                : attacks_bb(type_of(pc), s, occupied);
 }
 
-}  // namespace Stockfish::Attacks
+}  // namespace Andromeda::Attacks
 
 #endif  // #ifndef ATTACKS_H_INCLUDED
