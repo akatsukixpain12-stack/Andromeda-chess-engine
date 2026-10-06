@@ -1,4 +1,4 @@
-/* Andromeda - Stockfish-inspired score conversion. */
+/* Andromeda - Andromeda-inspired score conversion. */
 #include "score.h"
 #include <cassert>
 #include <cmath>
