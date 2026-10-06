@@ -361,7 +361,7 @@ const std::vector<std::vector<std::string>> BenchmarkPositions = {
 
 }  // namespace
 
-namespace Stockfish::Benchmark {
+namespace Andromeda::Benchmark {
 
 // Builds a list of UCI commands to be run by bench. There
 // are five parameters: TT size in MB, number of search threads that
