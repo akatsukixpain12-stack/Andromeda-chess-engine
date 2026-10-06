@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: andromeda-wasm-main
+  cancel-in-progress: true
+
 jobs:
   build-wasm:
     runs-on: ubuntu-24.04
@@ -36,4 +40,6 @@ jobs:
             exit 0
           fi
           git commit -m "build: regenerate Andromeda WASM engine [skip ci]"
-          git push
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
