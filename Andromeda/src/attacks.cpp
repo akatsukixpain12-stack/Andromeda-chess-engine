@@ -177,4 +177,4 @@ const Magic& magic(Square s, PieceType pt) {
 }
 #endif
 
-}  // namespace Stockfish::Attacks
+}  // namespace Andromeda::Attacks
