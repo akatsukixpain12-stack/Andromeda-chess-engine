@@ -19,6 +19,6 @@ struct BenchmarkSetup {
 
 BenchmarkSetup setup_benchmark(std::istream&);
 
-}  // namespace Stockfish::Benchmark
+}  // namespace Andromeda::Benchmark
 
 #endif  // #ifndef BENCHMARK_H_INCLUDED
