@@ -19,13 +19,13 @@
 #include "numa.h"
 #include "position.h"
 #include "search.h"
-#include "syzygy/tbprobe.h"  // for Stockfish::Depth
+#include "syzygy/tbprobe.h"  // for Andromeda::Depth
 #include "thread.h"
 #include "tt.h"
 #include "types.h"
 #include "ucioption.h"
 
-namespace Stockfish {
+namespace Andromeda {
 
 constexpr int MaxHashMB = Is64Bit ? 33554432 : 2048;
 extern int    MaxThreads;
@@ -118,7 +118,7 @@ class Engine {
     std::map<NumaIndex, SharedHistories>  sharedHists;
 };
 
-}  // namespace Stockfish
+}  // namespace Andromeda
 
 
 #endif  // #ifndef ENGINE_H_INCLUDED
