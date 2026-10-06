@@ -50,7 +50,7 @@ using AdjustTokenPrivileges_t =
 #endif
 
 
-namespace Stockfish {
+namespace Andromeda {
 
 constexpr usize HugePageSize = usize(1) << 30;
 
@@ -384,6 +384,6 @@ T load_as(const ByteT* buffer) {
     return value;
 }
 
-}  // namespace Stockfish
+}  // namespace Andromeda
 
 #endif  // #ifndef MEMORY_H_INCLUDED
