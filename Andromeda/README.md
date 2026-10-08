@@ -142,6 +142,10 @@ Content-Type: application/wasm
 
 Do not open the HTML file directly with `file://`; serve the website through a local/production HTTP(S) server.
 
+## Strength note
+
+Andromeda is being developed as an independent engine. Stockfish source was used as an architectural reference, but Stockfish code and NNUE weights are not copied into this repository. Playing strength must be established by objective testing such as tactical suites, self-play and engine-vs-engine matches before claiming superiority over Stockfish.
+
 ## License
 
 See the repository license files.
