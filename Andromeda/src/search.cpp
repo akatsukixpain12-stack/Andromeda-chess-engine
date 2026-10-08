@@ -211,7 +211,15 @@ Value Searcher::search(Position& pos,
     ++nodes_;
 
     if (!is_root && pos.is_draw(ss->ply))
+    {
+        // At Aggression 0, preserve the exact draw score. For positive
+        // aggression, discourage repetitions only when the side to move
+        // is not objectively worse. The bias is deliberately tiny.
+        if (aggression() > 0 && evaluate(pos) >= VALUE_DRAW)
+            return -static_cast<Value>((aggression() + 49) / 50);
+
         return VALUE_DRAW;
+    }
 
     const Key key = pos.key();
 
