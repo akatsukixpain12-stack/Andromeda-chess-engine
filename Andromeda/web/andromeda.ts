@@ -1,19 +1,29 @@
 /**
- * Andromeda browser integration.
+ * Andromeda browser adapter for the Emscripten/WASM build.
  *
- * The generated dist/andromeda.js is an ESM factory produced by Emscripten.
- * Copy this file into your website (or adjust the import path).
+ * Expected generated assets (per scripts/build-wasm.sh):
+ *   <repository-root>/dist/andromeda.js
+ *   <repository-root>/dist/andromeda.wasm
  *
- * Important: the current native search API is synchronous. Calling go()
- * performs the search on the calling thread. For a UI that must stay
- * responsive, run this wrapper inside a Web Worker.
+ * This file lives in Andromeda/web/, so the default asset path is ../../dist/.
+ *
+ * IMPORTANT: this lightweight engine's search API starts a search asynchronously.
+ * uci("go ...") starts the search; it does not synchronously return bestmove.
+ * For a responsive UI, use this adapter inside a Web Worker and poll/read output
+ * or extend the C++ API to expose search callbacks before treating it as a full
+ * streaming UCI engine.
  */
 
 type EmscriptenModule = {
-    _initialize_engine: () => void;
-    _send_uci_command: (command: string) => void;
-    _get_uci_output: () => number;
+    ccall: (
+        ident: string,
+        returnType: string | null,
+        argTypes: string[],
+        args: unknown[],
+    ) => unknown;
     UTF8ToString: (ptr: number) => string;
+    _initialize_engine: () => void;
+    _get_uci_output: () => number;
 };
 
 type AndromedaFactory = (options?: {
@@ -37,28 +47,53 @@ export type AndromedaEngine = {
     debug: () => string;
 };
 
+export type AndromedaEngineOptions = {
+    /** URL of generated dist/ directory. Override this when hosting assets elsewhere. */
+    wasmBaseUrl?: string | URL;
+    /** URL of generated andromeda.js ESM factory. */
+    moduleUrl?: string | URL;
+};
+
 export async function createAndromedaEngine(
-    wasmBaseUrl = new URL("../dist/", import.meta.url),
+    options: AndromedaEngineOptions = {},
 ): Promise<AndromedaEngine> {
-    // Emscripten emits the generated file as an ES module with a default
-    // factory when MODULARIZE + EXPORT_ES6 are enabled.
-    // @ts-ignore The generated Emscripten file has no hand-written .d.ts file.
-    const imported = await import("../dist/andromeda.js");
-    const factory = imported.default as AndromedaFactory;
+    const defaultDistUrl = new URL("../../dist/", import.meta.url);
+    const wasmBaseUrl = new URL(options.wasmBaseUrl ?? defaultDistUrl);
+    const moduleUrl = new URL(
+        options.moduleUrl ?? new URL("andromeda.js", wasmBaseUrl),
+    );
+
+    // A variable specifier avoids TypeScript requiring a declaration for the
+    // generated Emscripten JS file. The URL is resolved relative to this adapter.
+    const imported = await import(/* webpackIgnore: true */ /* @vite-ignore */ moduleUrl.href);
+    const factory = (imported.default ?? imported.AndromedaModule) as AndromedaFactory | undefined;
+
+    if (typeof factory !== "function") {
+        throw new Error(
+            "Andromeda WASM loader did not export a factory. Rebuild with -sMODULARIZE=1 -sEXPORT_ES6=1.",
+        );
+    }
 
     const module = await factory({
         locateFile(file: string, prefix: string) {
-            if (file.endsWith(".wasm"))
-                return new URL(file, wasmBaseUrl).href;
-            return prefix + file;
+            return file.endsWith(".wasm")
+                ? new URL(file, wasmBaseUrl).href
+                : prefix + file;
         },
     });
 
     module._initialize_engine();
 
+    const readOutput = (): string => {
+        const ptr = module._get_uci_output();
+        return ptr ? module.UTF8ToString(ptr) : "";
+    };
+
     const uci = (command: string): string => {
-        module._send_uci_command(command);
-        return module.UTF8ToString(module._get_uci_output());
+        // C/C++ expects const char*. Passing a JS string directly to the raw
+        // exported function is incorrect; ccall allocates/converts the string.
+        module.ccall("send_uci_command", null, ["string"], [command]);
+        return readOutput();
     };
 
     return {
@@ -69,12 +104,12 @@ export async function createAndromedaEngine(
             uci(moves.length ? `position startpos moves ${moves.join(" ")}` : "position startpos"),
         positionFen: (fen, moves = []) =>
             uci(`position fen ${fen}${moves.length ? ` moves ${moves.join(" ")}` : ""}`),
-        go: (options = {}) => {
+        go: (goOptions = {}) => {
             const parts: string[] = [];
-            if (options.depth !== undefined) parts.push(`depth ${options.depth}`);
-            if (options.movetime !== undefined) parts.push(`movetime ${options.movetime}`);
-            if (options.nodes !== undefined) parts.push(`nodes ${options.nodes}`);
-            if (options.infinite) parts.push("infinite");
+            if (goOptions.depth !== undefined) parts.push(`depth ${Math.max(1, Math.floor(goOptions.depth))}`);
+            if (goOptions.movetime !== undefined) parts.push(`movetime ${Math.max(1, Math.floor(goOptions.movetime))}`);
+            if (goOptions.nodes !== undefined) parts.push(`nodes ${Math.max(1, Math.floor(goOptions.nodes))}`);
+            if (goOptions.infinite) parts.push("infinite");
             return uci(`go${parts.length ? " " + parts.join(" ") : ""}`);
         },
         stop: () => uci("stop"),
