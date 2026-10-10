@@ -39,6 +39,16 @@ jobs:
             echo "Upstream: https://github.com/official-stockfish/Stockfish"
           } > Andromeda/stockfish-src/README-ANDROMEDA.md
 
+      - name: Compile and smoke-test upstream engine
+        run: |
+          set -euo pipefail
+          make -C Andromeda/stockfish-src/src -j2 build ARCH=x86-64
+          output="$(printf 'uci\nisready\nquit\n' | Andromeda/stockfish-src/src/stockfish)"
+          printf '%s\n' "$output"
+          grep -q 'uciok' <<< "$output"
+          grep -q 'readyok' <<< "$output"
+          make -C Andromeda/stockfish-src/src clean
+
       - name: Commit synchronized source snapshot
         run: |
           set -euo pipefail
