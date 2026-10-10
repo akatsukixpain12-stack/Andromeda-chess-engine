@@ -1,0 +1,58 @@
+name: Sync official Stockfish source
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/sync-stockfish.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-stockfish-source
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Andromeda
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch official Stockfish source
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/official-stockfish/Stockfish.git /tmp/stockfish
+          mkdir -p Andromeda/stockfish-src
+          rsync -a --delete --exclude='.git' /tmp/stockfish/src/ Andromeda/stockfish-src/src/
+          for file in Copying.txt AUTHORS README.md; do
+            if [ -f "/tmp/stockfish/$file" ]; then
+              cp "/tmp/stockfish/$file" "Andromeda/stockfish-src/$file"
+            fi
+          done
+          git -C /tmp/stockfish rev-parse HEAD > Andromeda/stockfish-src/UPSTREAM_COMMIT
+          {
+            echo "# Stockfish source snapshot"
+            echo
+            echo "This directory contains the official Stockfish source snapshot recorded in UPSTREAM_COMMIT."
+            echo "It is kept separate from Andromeda/src because the current Andromeda implementation uses a different API;"
+            echo "blindly overwriting it with Stockfish files would break its current native and WebAssembly entry points."
+            echo "Stockfish is GPLv3-or-later. Preserve all upstream notices when modifying or redistributing this source."
+            echo "Upstream: https://github.com/official-stockfish/Stockfish"
+          } > Andromeda/stockfish-src/README-ANDROMEDA.md
+
+      - name: Commit synchronized source snapshot
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Andromeda/stockfish-src
+          if git diff --cached --quiet; then
+            echo "Official Stockfish source snapshot is already current."
+            exit 0
+          fi
+          git commit -m "Vendor official Stockfish source snapshot"
+          git push
