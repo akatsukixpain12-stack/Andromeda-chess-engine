@@ -27,12 +27,7 @@ jobs:
           set -euo pipefail
           git clone --depth 1 https://github.com/official-stockfish/Stockfish.git /tmp/stockfish
           mkdir -p Andromeda/stockfish-src
-          rsync -a --delete --exclude='.git' /tmp/stockfish/src/ Andromeda/stockfish-src/src/
-          for file in Copying.txt AUTHORS README.md; do
-            if [ -f "/tmp/stockfish/$file" ]; then
-              cp "/tmp/stockfish/$file" "Andromeda/stockfish-src/$file"
-            fi
-          done
+          rsync -a --delete --exclude='.git' --exclude='.github' /tmp/stockfish/ Andromeda/stockfish-src/
           git -C /tmp/stockfish rev-parse HEAD > Andromeda/stockfish-src/UPSTREAM_COMMIT
           {
             echo "# Stockfish source snapshot"
